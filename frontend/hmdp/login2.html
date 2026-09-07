@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>小红碗点评</title>
+  <link href="./css/login.css" rel="stylesheet">
+  <!-- 引入样式 -->
+  <link rel="stylesheet" href="./css/element.css">
+
+  <style type="text/css">
+      .el-radio__input.is-checked .el-radio__inner {
+          border-color: #F63;
+          background: #F63;
+      }
+      .el-input__inner:focus {
+          border: 1px solid #F63;
+      }
+        .login-page-bg {
+          min-height: 100vh;
+          background: linear-gradient(160deg, #fff3ec 0%, #ffe0cc 100%);
+      }
+      .brand-logo {
+          text-align: center;
+          font-size: 26px;
+          font-weight: 700;
+          color: #ff6633;
+          letter-spacing: 3px;
+          padding: 26px 0 18px;
+      }
+      .login-container {
+          max-width: 420px;
+          margin: 0 auto;
+          background: #ffffff;
+          border-radius: 16px;
+          box-shadow: 0 8px 30px rgba(255, 102, 51, 0.18);
+          padding: 24px 22px;
+      }
+      .login-radio a, .login-container a { color: #ff6633; }
+</style>
+<link href="./css/theme.css" rel="stylesheet">
+</head>
+<body>
+<div class="login-page-bg">
+<div id="app">
+  <div class="brand-logo">🥣 小红碗点评</div>
+  <div class="login-container">
+    <div class="header">
+      <div class="header-back-btn" @click="goBack"><i class="el-icon-arrow-left"></i></div>
+      <div class="header-title">密码登录&nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <div class="content">
+      <div class="login-form">
+        <el-input name="phone" placeholder="请输入11位手机号" v-model="form.phone" maxlength="11" @input="v => form.phone = v.replace(/[^0-9]/g, '')">
+        </el-input>
+        <div style="height: 5px"></div>
+        <el-input name="password" placeholder="请输入密码" v-model="form.password">
+        </el-input>
+        <div style="text-align: center; color: #8c939d;margin: 5px 0"><a href="javascript:void(0)">忘记密码</a></div>
+        <el-button @click="login" style="width: 100%; background-color:#f63; color: #fff;">登录</el-button>
+        <div style="text-align: right; color:#333333; margin: 5px 0"><a href="/login.html">验证码登录</a></div>
+      </div>
+      <div class="login-radio">
+        <input name="radio" type="checkbox" id="readed" v-model="radio">
+        <label for="readed">我已阅读并同意</label>
+        <a href="/agreement.html" target="_blank">《小红碗点评用户服务协议》</a>、
+        <a href="/privacy.html" target="_blank">《隐私政策》</a>
+        等，接受免除或者限制责任、诉讼管辖约定等粗体标示条款
+      </div>
+    </div>
+  </div>
+</div>
+<script src="./js/vue.js"></script>
+<script src="./js/axios.min.js"></script>
+<!-- 引入组件库 -->
+<script src="./js/element.js"></script>
+<script src="./js/common.js"></script>
+<script>
+
+  const app = new Vue({
+    el: "#app",
+    data: {
+      radio: "",
+      form:{
+      }
+    },
+    methods: {
+      login(){
+        if(!this.radio){
+          this.$message.error("请先确认阅读用户协议！");
+          return;
+        }
+        axios.post("/user/login", this.form)
+          .then(({data}) => {
+            if(data){
+              // 保存用户信息到session
+              sessionStorage.setItem("token", data);
+            }
+            // 跳转到首页
+            location.href = "/info.html"
+          })
+          .catch(err => this.$message.error(err))
+      },
+      goBack(){
+        history.back();
+      }
+    }
+  })
+</script>
+</div>
+</body>
+</html>

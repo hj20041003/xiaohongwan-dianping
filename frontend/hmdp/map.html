@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地图找店 - 小红碗点评</title>
+    <link rel="stylesheet" href="./css/element.css">
+    <link href="./css/main.css" rel="stylesheet">
+    <link href="./css/leaflet.css" rel="stylesheet">
+    <style>
+        :root {
+            --brand-color: #ff6633;
+            --brand-light: #fff2ec;
+            --brand-border: #ffd9c9;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --bg-page: #f5f5f5;
+            --header-height: 50px;
+            --bar-max-height: 86px;
+        }
+        html, body { margin: 0; padding: 0; }
+        .map-page { height: calc(100vh - 120px); display: flex; flex-direction: column; }
+        .map-page__canvas { flex: 1; min-height: 60vh; z-index: 1; }
+        .shop-bar { background: #ffffff; padding: 10px 14px; overflow-x: auto; white-space: nowrap; box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08); max-height: var(--bar-max-height); }
+        .shop-bar__chip { display: inline-block; background: var(--brand-light); color: var(--brand-color); border: 1px solid var(--brand-border); border-radius: 16px; padding: 6px 14px; margin: 3px 6px; font-size: 13px; cursor: pointer; transition: opacity 0.15s; }
+        .shop-bar__chip:hover { opacity: 0.85; }
+        .shop-bar__chip--active { background: var(--brand-color); color: #ffffff; }
+        .shop-popup__name { font-size: 14px; font-weight: 600; color: var(--brand-color); }
+        .shop-popup__link { color: var(--brand-color); }
+        .header { position: relative; z-index: 2; }
+        .map-search { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #ffffff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06); }
+        .map-search .el-input { max-width: 420px; }
+        .map-search__count { color: #999999; font-size: 12px; white-space: nowrap; }
+    </style>
+<link href="./css/theme.css" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+    <header class="header">
+        <div class="header-back-btn" @click="handleBack"><i class="el-icon-arrow-left"></i></div>
+        <div class="header-title">地图找店</div>
+    </header>
+
+    <main class="map-page" v-loading="isLoading">
+        <div class="map-search">
+            <el-input name="searchKeyword" v-model="searchKeyword" size="small" placeholder="搜索地点、地址或商户名"
+                      clearable @keyup.enter.native="handleSearch" @clear="resetSearch">
+                <el-button slot="append" icon="el-icon-search" @click="handleSearch"></el-button>
+            </el-input>
+            <span class="map-search__count">{{ searchKeyword ? '找到 ' + shopList.length + ' 个结果' : '共 ' + shopList.length + ' 家商户' }}</span>
+        </div>
+        <section id="map" class="map-page__canvas" aria-label="商户地图"></section>
+        <nav class="shop-bar" aria-label="商户快捷列表">
+            <span class="shop-bar__chip"
+                  v-for="shop in shopList" :key="shop.id"
+                  :class="{ 'shop-bar__chip--active': activeShopId === shop.id }"
+                  @click="flyToShop(shop)">
+                📍 {{ shop.name }} · ¥{{ shop.avgPrice }}/人
+            </span>
+        </nav>
+    </main>
+
+    <foot-bar :active-btn="2"></foot-bar>
+</div>
+
+<script src="./js/vue.js"></script>
+<script src="./js/element.js"></script>
+<script src="./js/footer.js"></script>
+<script src="./js/leaflet.js"></script>
+<script>
+const CITY_CENTERS = {
+  '杭州': [30.322, 120.150],
+  '北京': [39.904, 116.407],
+  '上海': [31.230, 121.474],
+  '广州': [23.129, 113.264],
+  '深圳': [22.543, 114.058],
+  '成都': [30.572, 104.067],
+  '武汉': [30.593, 114.305],
+  '西安': [34.341, 108.940]
+};
+const MAP_CENTER = CITY_CENTERS[localStorage.getItem('city')] || CITY_CENTERS['杭州'];
+const MAP_ZOOM_DEFAULT = 13;
+const MAP_ZOOM_FOCUS = 15;
+const TILE_URL = 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}';
+const TILE_SUBDOMAINS = '1234';
+const SCORE_DIVISOR = 10;
+
+const escapeHtml = (value) => String(value == null ? '' : value)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+const app = new Vue({
+  el: '#app',
+  data: {
+    mapInstance: null,
+    markerList: [],
+    shopList: [],
+    activeShopId: null,
+    isLoading: true,
+    searchKeyword: ""
+  },
+  mounted() {
+    this.initMap();
+    this.loadShopList();
+  },
+  methods: {
+    handleBack() { history.back(); },
+    initMap() {
+      // 高德栅格瓦片为 GCJ-02 坐标系，与商户库内坐标一致
+      this.mapInstance = L.map('map').setView(MAP_CENTER, MAP_ZOOM_DEFAULT);
+      L.tileLayer(TILE_URL, { subdomains: TILE_SUBDOMAINS, attribution: '© 高德地图' })
+        .addTo(this.mapInstance);
+    },
+    async loadShopList() {
+      try {
+        const { data } = await axios.get('/shop/geo/list');
+        this.shopList = data || [];
+        this.renderMarkers();
+        if (this.shopList.length > 0) {
+          this.flyToShop(this.shopList[0]);
+        }
+      } catch (error) {
+        this.$message.error(String(error));
+      } finally {
+        this.isLoading = false;
+      }
+    },
+    renderMarkers() {
+      this.markerList.forEach(m => this.mapInstance.removeLayer(m));
+      this.markerList = [];
+      this.shopList.forEach(shop => {
+        const marker = L.marker([shop.y, shop.x]).addTo(this.mapInstance);
+        marker.bindPopup(this.buildPopupHtml(shop));
+        marker.on('click', () => { this.activeShopId = shop.id; });
+        this.markerList.push(marker);
+      });
+    },
+    async handleSearch() {
+      const kw = this.searchKeyword.trim();
+      if (!kw) { this.resetSearch(); return; }
+      try {
+        const resp = await axios.get('/shop/search', { params: { keyword: kw } });
+        this.shopList = resp.data || [];
+        this.renderMarkers();
+        if (this.shopList.length > 0) {
+          this.flyToShop(this.shopList[0]);
+          this.$message.success('找到 ' + this.shopList.length + ' 个匹配结果');
+        } else {
+          this.$message.warning('未找到匹配的地点');
+        }
+      } catch (error) {
+        this.$message.error(String(error));
+      }
+    },
+    resetSearch() {
+      this.searchKeyword = "";
+      this.loadShopList();
+    },
+    buildPopupHtml(shop) {
+      const score = (shop.score / SCORE_DIVISOR).toFixed(1);
+      return `<b class="shop-popup__name">${escapeHtml(shop.name)}</b><br/>` +
+        `${escapeHtml(shop.address)}<br/>` +
+        `人均 ¥${escapeHtml(shop.avgPrice)} · 评分 ${score}<br/>` +
+        `<a class="shop-popup__link" href="/shop-detail.html?id=${shop.id}">查看详情 →</a>`;
+    },
+    flyToShop(shop) {
+      this.activeShopId = shop.id;
+      this.mapInstance.flyTo([shop.y, shop.x], MAP_ZOOM_FOCUS);
+      this.markerList.forEach(marker => {
+        const { lat, lng } = marker.getLatLng();
+        if (Math.abs(lat - shop.y) < 1e-9 && Math.abs(lng - shop.x) < 1e-9) {
+          marker.openPopup();
+        }
+      });
+    }
+  }
+});
+</script>
+</body>
+</html>

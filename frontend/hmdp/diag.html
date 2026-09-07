@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>小红碗点评 · 环境诊断页</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; background: #f0f2f5; margin: 0; padding: 24px; }
+        .box { max-width: 760px; margin: 0 auto; }
+        h1 { font-size: 20px; color: #333; }
+        .banner { border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; font-size: 14px; line-height: 1.8; }
+        .banner--warn { background: #fff2ec; border: 1px solid #ffd9c9; color: #b45309; display: none; }
+        .banner--info { background: #e8f4ff; border: 1px solid #b3d8ff; color: #1e5fa8; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px;
+                overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        th, td { text-align: left; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+        th { background: #fafafa; color: #666; }
+        td.st-pass { color: #1a9c5b; font-weight: 700; }
+        td.st-fail { color: #e02020; font-weight: 700; }
+        td.st-pending { color: #999; }
+        .btn { margin-top: 14px; background: #ff6633; color: #fff; border: none; border-radius: 8px;
+               padding: 10px 22px; font-size: 14px; cursor: pointer; }
+        pre { background: #263445; color: #d4f1c5; border-radius: 10px; padding: 14px;
+              font-size: 12px; white-space: pre-wrap; word-break: break-all; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="box">
+    <h1>🥣 小红碗点评 · 浏览器环境诊断</h1>
+
+    <!-- JS 被拦截时的醒目提示：如果这行是红色显示出来，说明页面脚本没有执行 -->
+    <div class="banner banner--warn" id="jsBlockedBanner">
+        ⛔ 检测结果：本页面的 JavaScript <b>被浏览器拦截了</b>（下面所有项都会失败）。
+        常见原因：① Edge「增强网站安全性」开启（edge://settings/privacy 里关闭）
+        ② 广告拦截/隐私保护类扩展（换 InPrivate 窗口验证）
+        ③ 某些安全软件的网页防护。处理后再刷新本页。
+    </div>
+
+    <div class="banner banner--info">
+        本页面无需登录、不依赖任何第三方库。等下方表格全部变成 ✅ 后，回到正常页面即可。
+        完成后点底部「复制诊断结果」发截图或文本均可。
+    </div>
+
+    <table>
+        <tr><th>检测项</th><th>状态</th><th>说明</th></tr>
+        <tr><td>JavaScript 脚本执行</td><td class="st-pending" id="r-js">检测中…</td><td>页面脚本是否被允许运行</td></tr>
+        <tr><td>样式表 element.css</td><td class="st-pending" id="r-elcss">检测中…</td><td>组件库样式</td></tr>
+        <tr><td>样式表 main.css</td><td class="st-pending" id="r-maincss">检测中…</td><td>基础样式</td></tr>
+        <tr><td>样式表 theme.css</td><td class="st-pending" id="r-themecss">检测中…</td><td>主题样式</td></tr>
+        <tr><td>脚本 vue.js</td><td class="st-pending" id="r-vue">检测中…</td><td>前端框架</td></tr>
+        <tr><td>脚本 element.js</td><td class="st-pending" id="r-element">检测中…</td><td>组件库</td></tr>
+        <tr><td>脚本 axios</td><td class="st-pending" id="r-axios">检测中…</td><td>请求库</td></tr>
+        <tr><td>脚本 leaflet.js</td><td class="st-pending" id="r-leaflet">检测中…</td><td>地图库</td></tr>
+        <tr><td>脚本 china-area.js</td><td class="st-pending" id="r-area">检测中…</td><td>省市区数据</td></tr>
+        <tr><td>Vue 组件编译</td><td class="st-pending" id="r-compile">检测中…</td><td>页面控件是否被正确渲染</td></tr>
+        <tr><td>后端接口连通</td><td class="st-pending" id="r-api">检测中…</td><td>/api/shop-type/list</td></tr>
+    </table>
+
+    <button class="btn" id="copyBtn">📋 复制诊断结果</button>
+    <pre id="report" style="display:none"></pre>
+</div>
+
+<script>
+// 若此脚本被 CSP/扩展拦截，上面的红色横幅会保持显示
+window.__JS_RAN = true;
+document.getElementById("jsBlockedBanner").style.display = "none";
+
+function setResult(id, pass, note) {
+    const el = document.getElementById(id);
+    el.textContent = (pass ? "✅ 通过" : "❌ 失败") + (note ? "（" + note + "）" : "");
+    el.className = pass ? "st-pass" : "st-fail";
+}
+
+const RESULTS = [];
+function record(name, pass, note) {
+    RESULTS.push((pass ? "[PASS] " : "[FAIL] ") + name + (note ? " | " + note : ""));
+}
+
+function checkRes(id, name, url) {
+    const t0 = Date.now();
+    return fetch(url, { cache: "no-store" })
+        .then(r => {
+            const ok = r.ok;
+            const type = r.headers.get("content-type") || "";
+            // 关键：CSS 如果被缓存成 HTML（历史坏缓存），content-type 会是 text/html
+            const mimeOk = url.indexOf(".css") === -1 ? true : type.indexOf("css") !== -1 || type.indexOf("html") === -1 ? type.indexOf("css") !== -1 : true;
+            setResult(id, ok, r.status + " " + type.slice(0, 30));
+            record(name, ok, "HTTP " + r.status + " " + type.slice(0, 40));
+        })
+        .catch(e => {
+            setResult(id, false, "请求失败: " + e);
+            record(name, false, String(e));
+        });
+}
+
+window.addEventListener("load", function () {
+    // 1. JS 执行
+    setResult("r-js", true, "脚本可正常运行");
+    record("JavaScript 执行", true, "");
+
+    // 2. Vue 组件编译检测：页面上故意放一个未编译探针
+    const probe = document.createElement("div");
+    probe.id = "compile-probe";
+    probe.innerHTML = "<el-input></el-input>";
+    document.body.appendChild(probe);
+    const compiled = probe.querySelector("el-input .el-input__inner") !== null;
+    setResult("r-compile", compiled, compiled ? "" : "el-input 未被编译（Vue/element 未生效）");
+    record("Vue 组件编译", compiled, compiled ? "" : "探针 el-input 未编译");
+    document.body.removeChild(probe);
+
+    // 3. 样式表加载（fetch 检查内容与类型）
+    Promise.all([
+        checkRes("r-elcss", "样式表 element.css", "css/element.css"),
+        checkRes("r-maincss", "样式表 main.css", "css/main.css"),
+        checkRes("r-themecss", "样式表 theme.css", "css/theme.css")
+    ]).then(finish);
+
+    // 4. 全局对象
+    setResult("r-vue", typeof Vue !== "undefined", typeof Vue);
+    record("脚本 vue.js", typeof Vue !== "undefined", "Vue=" + typeof Vue);
+    setResult("r-element", typeof ElementUI !== "undefined", typeof ElementUI);
+    record("脚本 element.js", typeof ElementUI !== "undefined", "ElementUI=" + typeof ElementUI);
+    setResult("r-axios", typeof axios !== "undefined", typeof axios);
+    record("脚本 axios", typeof axios !== "undefined", "axios=" + typeof axios);
+    setResult("r-leaflet", typeof L !== "undefined", typeof L);
+    record("脚本 leaflet.js", typeof L !== "undefined", "L=" + typeof L);
+    setResult("r-area", typeof CHINA_AREA3 !== "undefined", typeof CHINA_AREA3);
+    record("脚本 china-area.js", typeof CHINA_AREA3 !== "undefined", "CHINA_AREA3=" + typeof CHINA_AREA3);
+
+    // 5. 后端接口
+    fetch("/api/shop-type/list", { cache: "no-store" })
+        .then(r => r.json())
+        .then(j => {
+            const ok = j.success === true;
+            setResult("r-api", ok, ok ? "返回 " + (j.data || []).length + " 个分类" : "返回异常");
+            record("后端接口连通", ok, JSON.stringify(j).slice(0, 60));
+        })
+        .catch(e => {
+            setResult("r-api", false, String(e));
+            record("后端接口连通", false, String(e));
+        });
+
+    function finish() { /* 预留 */ }
+
+    // 复制按钮
+    document.getElementById("copyBtn").addEventListener("click", function () {
+        const text = "诊断时间: " + new Date().toLocaleString()
+            + "\nUA: " + navigator.userAgent
+            + "\n地址: " + location.href
+            + "\n" + RESULTS.join("\n");
+        const pre = document.getElementById("report");
+        pre.style.display = "block";
+        pre.textContent = text;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(
+                () => { pre.textContent += "\n\n✅ 已复制到剪贴板"; },
+                () => {});
+        }
+    });
+});
+</script>
+</body>
+</html>

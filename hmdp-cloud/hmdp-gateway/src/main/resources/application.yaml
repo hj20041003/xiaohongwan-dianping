@@ -1,0 +1,27 @@
+server:
+  port: 8090
+spring:
+  application:
+    name: hmdp-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+    gateway:
+      routes:
+        - id: user-service
+          uri: lb://hmdp-user
+          predicates:
+            - Path=/user/**,/upload/**
+        - id: shop-service
+          uri: lb://hmdp-shop
+          predicates:
+            - Path=/shop/**,/shop-type/**,/score/**,/favorite/**
+        - id: voucher-service
+          uri: lb://hmdp-voucher
+          predicates:
+            - Path=/voucher/**,/voucher-order/**
+        - id: blog-service
+          uri: lb://hmdp-blog
+          predicates:
+            - Path=/blog/**,/blog-comments/**,/follow/**,/message/**

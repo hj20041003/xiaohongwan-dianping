@@ -1,0 +1,110 @@
+/* ============================================================
+   小红碗点评 · 全站主题层
+   设计基调：暖橙品牌色 + 浅灰底 + 白卡片 + 柔和阴影
+   加载顺序：必须在各页面自身 css 之后（最后一个 link）
+   ============================================================ */
+:root {
+    --brand: #ff6633;
+    --brand-2: #ff8855;
+    --brand-light: #fff2ec;
+    --brand-border: #ffd9c9;
+    --brand-grad: linear-gradient(135deg, #ff6633, #ff8855);
+    --bg-page: #f7f7f8;
+    --card-bg: #ffffff;
+    --text-1: #333333;
+    --text-2: #666666;
+    --text-3: #999999;
+    --radius-card: 14px;
+    --radius-input: 18px;
+    --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+    --shadow-hover: 0 6px 20px rgba(255, 102, 51, 0.15);
+}
+
+body {
+    background: var(--bg-page);
+    color: var(--text-1);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 页面头部统一 ---------- */
+.header {
+    background: #ffffff;
+    border-bottom: 1px solid #f0f0f0;
+}
+.header-back-btn,
+.header-search,
+.header-share {
+    color: var(--brand) !important;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+.header-back-btn:hover,
+.header-search:hover,
+.header-share:hover {
+    transform: scale(1.15);
+}
+.header-title {
+    font-weight: 600;
+}
+
+/* ---------- 滚动条 ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #dddddd; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #c8c8c8; }
+
+/* ---------- Element 组件统一 ---------- */
+.el-input__inner { border-radius: var(--radius-input); }
+.el-button { border-radius: var(--radius-input); }
+.el-button--primary {
+    background: var(--brand);
+    border-color: var(--brand);
+}
+.el-button--primary:hover,
+.el-button--primary:focus {
+    background: var(--brand-2);
+    border-color: var(--brand-2);
+}
+.el-button--success {
+    background: var(--brand);
+    border-color: var(--brand);
+}
+.el-button--success:hover,
+.el-button--success:focus {
+    background: var(--brand-2);
+    border-color: var(--brand-2);
+}
+.el-dialog { border-radius: var(--radius-card); }
+.el-message { border-radius: 20px; }
+.el-tabs__item.is-active { color: var(--brand); }
+.el-rate__icon { margin-right: 0; }
+
+/* ---------- 列表卡片：悬浮上浮 ---------- */
+.shop-box,
+.blog-box {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.shop-box:hover,
+.blog-box:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+.shop-box img,
+.blog-box img {
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+/* ---------- 底部导航 ---------- */
+.foot {
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+}
+.foot-box { transition: color 0.15s, transform 0.15s; }
+.foot-box:active { transform: scale(0.92); }
+
+/* ---------- 链接 ---------- */
+a { transition: opacity 0.15s; }
+a:hover { opacity: 0.8; }
+
+/* ---------- 通用工具 ---------- */
+[v-loading] { min-height: 120px; }

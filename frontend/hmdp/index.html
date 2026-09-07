@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>小红碗点评</title>
+  <!-- 引入样式 -->
+  <link rel="stylesheet" href="./css/element.css">
+
+  <link href="./css/index.css" rel="stylesheet">
+  <link href="./css/main.css" rel="stylesheet">
+
+  <style type="text/css">
+      .el-input__inner {
+          border-radius: 20px;
+      }
+      
+      /* 进一步优化布局 */
+      .type-list {
+          flex-shrink: 0;
+      }
+      
+      .blog-list {
+          flex: 1;
+          overflow-y: auto;
+      }
+      
+      /* 确保图片加载时的占位 */
+      .blog-img {
+          position: relative;
+          background-color: #f5f5f5;
+      }
+      
+      /* 优化用户头像显示 */
+      .blog-user-icon img {
+          background-color: #f0f0f0;
+      }
+      
+      /* 响应式优化 */
+      @media (max-width: 480px) {
+          .type-box {
+              width: 22%;
+          }
+          
+          .blog-box {
+              width: 100%;
+              margin-bottom: 10px;
+          }
+          
+          .blog-list {
+              padding: 10px 5px 80px 5px;
+          }
+      }
+      .feature-bar {
+          display: flex;
+          gap: 8px;
+          padding: 8px 10px 0;
+          overflow-x: auto;
+          flex-shrink: 0;
+      }
+      .feature-bar { padding: 10px; }
+      .feature-entry {
+          display: inline-flex; align-items: center; gap: 8px;
+          background: #ffffff; border-radius: 12px;
+          padding: 8px 14px; margin-right: 10px;
+          box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+          cursor: pointer; transition: box-shadow 0.15s, transform 0.15s;
+      }
+      .feature-entry:hover { box-shadow: 0 6px 18px rgba(255, 102, 51, 0.15); transform: translateY(-1px); }
+      .feature-entry__icon {
+          width: 30px; height: 30px; border-radius: 50%;
+          display: inline-flex; align-items: center; justify-content: center;
+          font-size: 17px; color: #ffffff;
+      }
+      .feature-entry__icon--map { background: linear-gradient(135deg, #ff6633, #ff8855); }
+      .feature-entry__icon--score { background: linear-gradient(135deg, #ff9966, #ffbb88); }
+      .feature-entry__icon--fav { background: linear-gradient(135deg, #ff5577, #ff88aa); }
+      .feature-entry__icon--admin { background: linear-gradient(135deg, #667eea, #88aaff); }
+      .feature-entry__text { font-size: 13px; color: #333333; font-weight: 600; }
+      .city-picker { display: flex; gap: 12px; height: 280px; }
+      .city-province-col { width: 130px; overflow-y: auto; border-right: 1px solid #f0f0f0; }
+      .city-province { padding: 9px 12px; font-size: 14px; cursor: pointer; border-radius: 6px; }
+      .city-province:hover { background: #fff2ec; }
+      .city-province--active { background: #fff2ec; color: #ff6633; font-weight: 600; }
+      .city-list-col { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-content: start; padding: 4px; }
+      .city-item { text-align: center; padding: 9px 0; border: 1px solid #eee; border-radius: 8px; cursor: pointer; font-size: 14px; }
+      .city-item:hover { border-color: #ff6633; color: #ff6633; }
+      .city-item--active { background: #fff2ec; border-color: #ff6633; color: #ff6633; font-weight: 600; }
+      .city-empty { grid-column: 1 / -1; text-align: center; color: #999; padding: 30px 0; }
+      .city-tip { text-align: center; color: #999; font-size: 12px; margin-top: 12px; }
+      .back-top {
+          position: fixed; right: 16px; bottom: 80px; z-index: 1200;
+          width: 42px; height: 42px; border-radius: 50%;
+          background: #ffffff; color: #ff6633;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 20px; cursor: pointer;
+          transition: transform 0.15s;
+      }
+      .back-top:hover { transform: translateY(-3px); }
+      .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+      .fade-enter, .fade-leave-to { opacity: 0; }
+      .brand-mini {
+          color: #ffffff;
+          font-size: 15px;
+          font-weight: 700;
+          white-space: nowrap;
+      }
+  </style>
+<link href="./css/theme.css" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+  <div class="search-bar">
+    <div class="brand-mini">🥣 小红碗</div>
+    <div class="city-btn" @click="cityPickerVisible = true">{{ city }}<template v-if="area"> · {{ area }}</template> <i class="el-icon-arrow-down"></i></div>
+    <div class="search-input">
+      <el-input name="searchKey" size="mini" placeholder="请输入商户名、地点" v-model="searchKey"
+                @keyup.enter.native="onSearchKeyup" clearable>
+        <i slot="prefix" class="el-input__icon el-icon-search" style="cursor: pointer" @click="doSearch"></i>
+      </el-input>
+    </div>
+    <div class="header-icon" @click="toPage(4)"><i class="el-icon-user"></i></div>
+  </div>
+  <div class="type-list">
+    <div class="type-box" v-for="t in types" :key="t.id" @click="toShopList(t.id, t.name)">
+      <div class="type-view"><img :src="'/imgs/' + t.icon" alt=""></div>
+      <div class="type-text">{{t.name}}</div>
+    </div>
+  </div>
+  <div class="feature-bar">
+    <span class="feature-entry" @click="goFeature('/map.html')">
+      <span class="feature-entry__icon feature-entry__icon--map"><i class="el-icon-map-location"></i></span>
+      <span class="feature-entry__text">地图找店</span>
+    </span>
+    <span class="feature-entry" @click="goFeature('/score.html')">
+      <span class="feature-entry__icon feature-entry__icon--score"><i class="el-icon-star-off"></i></span>
+      <span class="feature-entry__text">评分排行</span>
+    </span>
+    <span class="feature-entry" @click="goFeature('/favorite.html')">
+      <span class="feature-entry__icon feature-entry__icon--fav"><i class="el-icon-star-on"></i></span>
+      <span class="feature-entry__text">我的收藏</span>
+    </span>
+    <span class="feature-entry" @click="goFeature('/admin.html')">
+      <span class="feature-entry__icon feature-entry__icon--admin"><i class="el-icon-setting"></i></span>
+      <span class="feature-entry__text">管理后端</span>
+    </span>
+  </div>
+  <div class="blog-list" @scroll="onScroll">
+    <div class="blog-box" v-for="b in blogs" :key="b.id">
+      <div class="blog-img" @click="toBlogDetail(b)"><img :src="b.img" alt=""></div>
+      <div class="blog-title">{{b.title}}</div>
+      <div class="blog-foot">
+        <div class="blog-user-icon"><img :src="b.icon || '/imgs/icons/default-icon.png'" alt=""></div>
+        <div class="blog-user-name">{{b.name}}</div>
+        <div class="blog-liked" @click="addLike(b)">
+          <svg t="1646634642977" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2187" width="14" height="14">
+            <path d="M160 944c0 8.8-7.2 16-16 16h-32c-26.5 0-48-21.5-48-48V528c0-26.5 21.5-48 48-48h32c8.8 0 16 7.2 16 16v448zM96 416c-53 0-96 43-96 96v416c0 53 43 96 96 96h96c17.7 0 32-14.3 32-32V448c0-17.7-14.3-32-32-32H96zM505.6 64c16.2 0 26.4 8.7 31 13.9 4.6 5.2 12.1 16.3 10.3 32.4l-23.5 203.4c-4.9 42.2 8.6 84.6 36.8 116.4 28.3 31.7 68.9 49.9 111.4 49.9h271.2c6.6 0 10.8 3.3 13.2 6.1s5 7.5 4 14l-48 303.4c-6.9 43.6-29.1 83.4-62.7 112C815.8 944.2 773 960 728.9 960h-317c-33.1 0-59.9-26.8-59.9-59.9v-455c0-6.1 1.7-12 5-17.1 69.5-109 106.4-234.2 107-364h41.6z m0-64h-44.9C427.2 0 400 27.2 400 60.7c0 127.1-39.1 251.2-112 355.3v484.1c0 68.4 55.5 123.9 123.9 123.9h317c122.7 0 227.2-89.3 246.3-210.5l47.9-303.4c7.8-49.4-30.4-94.1-80.4-94.1H671.6c-50.9 0-90.5-44.4-84.6-95l23.5-203.4C617.7 55 568.7 0 505.6 0z" p-id="2188" :fill="b.isLike ? '#ff6633' : '#82848a'"></path>
+          </svg>
+          {{b.liked}}
+        </div>
+      </div>
+    </div>
+  </div>
+  <el-dialog title="选择城市" :visible.sync="cityPickerVisible" width="480px" center>
+      <el-input name="citySearch" v-model="citySearch" size="small" placeholder="搜索城市名" clearable
+                style="margin-bottom: 12px"></el-input>
+      <div class="city-picker">
+        <div class="city-province-col">
+          <div class="city-province" v-for="prov in filteredProvinces" :key="prov"
+               :class="{ 'city-province--active': prov === activeProvince }"
+               @click="activeProvince = prov; activeCityIdx = -1">{{ prov }}</div>
+        </div>
+        <div class="city-list-col">
+          <span class="city-item" v-for="(c, ci) in shownCities" :key="c.name"
+                :class="{ 'city-item--active': ci === activeCityIdx }"
+                @click="pickCity(ci)">{{ c.name }}</span>
+          <div class="city-empty" v-if="shownCities.length === 0">该省暂无城市数据</div>
+        </div>
+        <div class="city-list-col" v-if="activeCityIdx >= 0">
+          <span class="city-item" v-for="d in shownDistricts" :key="d"
+                :class="{ 'city-item--active': area === d }"
+                @click="selectCity(shownCities[activeCityIdx].name, d)">{{ d }}</span>
+          <div class="city-empty" v-if="shownDistricts.length === 0">该市暂无区县数据</div>
+        </div>
+      </div>
+      <div class="city-tip">点市名直接切换；点区名可精确到区 · 演示商户数据位于杭州</div>
+  </el-dialog>
+  <transition name="fade">
+    <div class="back-top" v-show="showBackTop" @click="toTop">
+      <i class="el-icon-top"></i>
+    </div>
+  </transition>
+  <foot-bar :active-btn="1"></foot-bar>
+</div>
+<script src="./js/vue.js"></script>
+<script src="./js/axios.min.js"></script>
+<!-- 引入组件库 -->
+<script src="./js/element.js"></script>
+<script src="./js/common.js"></script>
+<script src="./js/china-area.js"></script>
+<script src="./js/footer.js"></script>
+<script>
+
+  const app = new Vue({
+    el: "#app",
+    data: {
+      isReachBottom: false,
+      showBackTop: false,
+      types: [], // 类型列表
+      blogs: [], // 播客列表
+      current: 1,// blog的页码
+      searchKey: "",
+      city: localStorage.getItem("city") || "杭州",
+      area: localStorage.getItem("area") || "",
+      citySearch: "",
+      activeProvince: "浙江省",
+      activeCityIdx: -1,
+      cityPickerVisible: false,
+    },
+    computed: {
+      filteredProvinces() {
+        const kw = this.citySearch.trim();
+        if (!kw) return CHINA_AREA3.map(p => p.name);
+        return CHINA_AREA3.filter(
+          p => p.name.includes(kw) || p.cities.some(c => c.name.includes(kw)
+               || c.districts.some(d => d.includes(kw)))
+        ).map(p => p.name);
+      },
+      shownCities() {
+        const prov = CHINA_AREA3.find(p => p.name === this.activeProvince);
+        if (!prov) return [];
+        const kw = this.citySearch.trim();
+        if (kw && this.filteredProvinces.length > 1) return prov.cities.map(c => c);
+        return prov.cities;
+      },
+      shownDistricts() {
+        const c = this.shownCities[this.activeCityIdx];
+        return c ? c.districts : [];
+      }
+    },
+    created() {
+      // 查询类型
+      this.queryTypes();
+      this.queryHotBlogsScroll();
+    },
+    methods: {
+      queryTypes() {
+        axios.get("/shop-type/list")
+          .then(({data}) => {
+            this.types = data;
+          })
+          .catch(err => {
+            this.$message.error(err)
+          })
+      },
+      queryHotBlogsScroll() {
+        axios.get("/blog/hot?current=" + this.current)
+          .then(({data}) => {
+            data.forEach(b => b.img = (b.images || "/imgs/icons/default-icon.png").split(",")[0] || "/imgs/icons/default-icon.png");
+            this.blogs = this.blogs.concat(data);
+          })
+          .catch(err => {
+            this.$message.error(err)
+          })
+      },
+      addLike(b) {
+        axios.put("/blog/like/" +b.id)
+          .then(({data}) => {
+            this.queryBlogById(b)
+          })
+          .catch(err => {
+            this.$message.error(err)
+          })
+      },
+      queryBlogById(b) {
+        axios.get("/blog/" + b.id)
+          .then(({data}) => {
+            b.liked = data.liked;
+            b.isLike = data.isLike;
+          })
+          .catch(() => {
+            this.$message.error
+            b.liked ++;
+          })
+      },
+      onScroll(e) {
+        this.showBackTop = e.target.scrollTop > 300;
+        let scrollTop = e.target.scrollTop;
+        let offsetHeight = e.target.offsetHeight;
+        let scrollHeight = e.target.scrollHeight;
+        if (scrollTop + offsetHeight > scrollHeight && !this.isReachBottom) {
+          this.isReachBottom = true
+
+          // 再次查询下一页数据
+          this.current++;
+          this.queryHotBlogsScroll();
+        } else {
+          this.isReachBottom = false
+        }
+      },
+      onSearchKeyup(e) {
+        // 中文输入法选字时的回车不触发搜索
+        if (e.isComposing || e.keyCode === 229) return;
+        this.doSearch();
+      },
+      doSearch() {
+        const kw = this.searchKey.trim();
+        if (!kw) { this.$message.warning("请输入商户名或地点"); return; }
+        // 输入的是城市/省份名 → 切换城市并打开地图
+        const isCity = CHINA_AREA3.some(
+          prov => prov.name.includes(kw) || prov.cities.some(c => c.name === kw || c.name.includes(kw))
+        );
+        if (isCity) {
+          localStorage.setItem("city", kw);
+          this.$message.success("已切换至 " + kw + "，正在打开地图");
+          setTimeout(() => { location.href = "/map.html"; }, 500);
+          return;
+        }
+        location.href = "/shop-list.html?search=" + encodeURIComponent(kw);
+      },
+      pickCity(idx) {
+        this.activeCityIdx = idx;
+      },
+      selectCity(cityName, district) {
+        this.city = cityName;
+        this.area = district || "";
+        localStorage.setItem("city", cityName);
+        localStorage.setItem("area", this.area);
+        this.cityPickerVisible = false;
+        this.$message.success(district ? ("已切换至 " + cityName + " · " + district) : ("已切换至 " + cityName));
+      },
+      toTop() {
+        const list = document.querySelector('.blog-list');
+        if (list) list.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+      goFeature(url) {
+        location.href = url;
+      },
+      toShopList(id, name) {
+        location.href = "/shop-list.html?type=" + id + "&name=" + name
+      },
+      toBlogDetail(b) {
+        location.href = "/blog-detail.html?id=" + b.id
+      }
+    }
+  })
+</script>
+</body>
+</html>

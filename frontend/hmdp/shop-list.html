@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>小红碗点评</title>
+  <!-- 引入样式 -->
+  <link rel="stylesheet" href="./css/element.css">
+
+  <link href="./css/shop-list.css" rel="stylesheet">
+  <link href="./css/main.css" rel="stylesheet">
+
+  <style type="text/css">
+      .sort-item--active { color: #ff6633; font-weight: 600; }
+      .list-search { padding: 8px 10px; background: #ffffff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04); }
+      .header-search { cursor: pointer; }
+      .shop-empty { text-align: center; padding: 70px 20px; color: #999; }
+      .shop-empty__icon { font-size: 48px; margin-bottom: 12px; }
+      .shop-empty__text { font-size: 15px; color: #333; margin-bottom: 6px; }
+      .shop-empty__sub { font-size: 13px; }
+      .shop-info { flex: 1; }
+      .shop-box { margin: 8px 10px; border-radius: 12px; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05); }
+      .shop-box:hover { box-shadow: 0 6px 20px rgba(255, 102, 51, 0.15); }
+      .shop-img img { border-radius: 10px; }
+      .shop-title { color: #333; }
+      .shop-rate span { color: #999; font-size: 12px; }
+  </style>
+<link href="./css/theme.css" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-back-btn" @click="goBack"><i class="el-icon-arrow-left"></i></div>
+    <div class="header-title">{{typeName}}</div>
+    <div class="header-search" @click="showSearch = !showSearch">
+      <i class="el-icon-search"></i>
+    </div>
+  </div>
+  <div class="list-search" v-if="showSearch">
+    <el-input name="searchKey" v-model="searchKey" size="small" placeholder="搜索商户名、地址或地区"
+              clearable @keyup.enter.native="onSearchKeyup" @clear="resetQuickSearch">
+      <el-button slot="append" icon="el-icon-search" @click="doQuickSearch"></el-button>
+    </el-input>
+  </div>
+  <div class="sort-bar">
+    <div class="sort-item">
+      <el-dropdown trigger="click" @command="handleCommand">
+      <span class="el-dropdown-link">
+        {{typeName}}<i class="el-icon-arrow-down el-icon--right"></i>
+      </span>
+        <el-dropdown-menu slot="dropdown">
+          <el-dropdown-item v-for="t in types" :key="t.id" :command="t">
+            {{t.name}}
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </el-dropdown>
+    </div>
+    <div class="sort-item" :class="{ 'sort-item--active': sortActive === 'distance' }" @click="sortByDistance()">
+      距离 <i class="el-icon-arrow-down el-icon--right"></i>
+    </div>
+    <div class="sort-item" :class="{ 'sort-item--active': sortActive === 'comments' }" @click="sortAndQuery('comments')">
+      人气 <i class="el-icon-arrow-down el-icon--right"></i>
+    </div>
+    <div class="sort-item" :class="{ 'sort-item--active': sortActive === 'score' }" @click="sortAndQuery('score')">
+      评分 <i class="el-icon-arrow-down el-icon--right"></i>
+    </div>
+  </div>
+  <div class="shop-list" @scroll="onScroll">
+    <div class="shop-box" v-for="s in shops" :key="s.id" @click="toDetail(s.id)">
+      <div class="shop-img"><img :src="s.images" alt=""></div>
+      <div class="shop-info">
+        <div class="shop-title shop-item">{{s.name}}</div>
+        <div class="shop-rate shop-item" >
+          <el-rate
+              disabled v-model="s.score/10"
+              text-color="#F63"
+              show-score
+          ></el-rate>
+          <span>{{s.comments}}条</span>
+        </div>
+        <div class="shop-area shop-item">
+          <span>{{s.area}}</span>
+          <span v-if="s.distance">{{s.distance < 1000 ? s.distance.toFixed(1) + 'm' : (s.distance/1000).toFixed(1) + 'km'}}</span>
+        </div>
+        <div class="shop-avg shop-item">￥{{s.avgPrice}}/人</div>
+        <div class="shop-address shop-item">
+          <i class="el-icon-map-location"></i>
+          <span>{{s.address}}</span>
+        </div>
+      </div>
+      <div class="shop-empty" v-if="!isLoading && shops.length === 0">
+        <div class="shop-empty__icon">🔍</div>
+        <div class="shop-empty__text">没有找到与「{{ searchName || typeName }}」相关的商户</div>
+        <div class="shop-empty__sub">换个关键词试试，或者点击左上角返回首页</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="./js/vue.js"></script>
+<script src="./js/axios.min.js"></script>
+<!-- 引入组件库 -->
+<script src="./js/element.js"></script>
+<script src="./js/common.js"></script>
+<script>
+
+  const app = new Vue({
+    el: "#app",
+    data: {
+      util,
+      isReachBottom: false,
+      types: [], // 类型列表
+      shops: [], // 商店列表
+      typeName: "",
+      searchName: "",
+      isLoading: false,
+      showSearch: false,
+      searchKey: "",
+      sortActive: "",
+      params:{
+        typeId: 0,
+        current: 1,
+        sortBy: "",
+        x: 120.149993, // 经度
+        y: 30.334229 // 纬度
+      }
+    },
+    created() {
+      // 获取参数
+      this.params.typeId = util.getUrlParam("type");
+      this.typeName = util.getUrlParam("name");
+      this.searchName = util.getUrlParam("search") || "";
+      if (this.searchName) {
+        this.typeName = "搜索：" + this.searchName;
+      }
+      // 查询类型
+      this.queryTypes();
+      // 查询商店
+      this.queryShops();
+    },
+    methods: {
+      queryTypes() {
+        axios.get("/shop-type/list")
+          .then(({data}) => {
+            this.types = data;
+          })
+          .catch(err => {
+            console.log(err);
+            this.$message.error(err)
+          })
+      },
+      queryShops() {
+        const url = this.searchName ? "/shop/of/name" : "/shop/of/type";
+        const params = Object.assign({}, this.params);
+        if (this.searchName) params.name = this.searchName;
+        axios.get(url, {
+            params: params
+          })
+          .then(({data}) => {
+            if (!data) {
+              return
+            }
+            data.forEach(s => {
+              s.images = (s.images || '/imgs/icons/default-icon.png').split(',')[0];
+              if (this.sortActive === 'distance') {
+                s.distance = this.calcDistance(s);
+              }
+            });
+            this.shops = this.shops.concat(data);
+          })
+          .catch(err => {
+            console.log(err);
+            this.$message.error(err)
+          })
+      },
+      handleCommand(t) {
+        location.href = "/shop-list.html?type="+t.id+"&name="+t.name;
+      },
+      sortAndQuery(sortBy) {
+        this.sortActive = sortBy;
+        this.params.sortBy = sortBy;
+        this.shops = [];
+        this.params.current = 1;
+        this.queryShops();
+      },
+      sortByDistance() {
+        if (this.searchName) {
+          this.$message.warning("搜索结果不支持按距离排序");
+          return;
+        }
+        this.sortActive = 'distance';
+        this.params.sortBy = 'distance';
+        this.shops = [];
+        this.params.current = 1;
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              this.params.x = pos.coords.longitude;
+              this.params.y = pos.coords.latitude;
+              this.queryShops();
+            },
+            () => {
+              // 定位失败/被拒绝：回退默认坐标（杭州）
+              this.$message.warning('未授权定位，按默认位置排序');
+              this.queryShops();
+            },
+            { timeout: 5000 }
+          );
+        } else {
+          this.queryShops();
+        }
+      },
+      calcDistance(shop) {
+        const rad = Math.PI / 180;
+        const dx = (shop.x - this.params.x) * 85.2;
+        const dy = (shop.y - this.params.y) * 111.0;
+        return Math.sqrt(dx * dx + dy * dy) * 1000;
+      },
+      onSearchKeyup(e) {
+        if (e.isComposing || e.keyCode === 229) return;
+        this.doQuickSearch();
+      },
+      doQuickSearch() {
+        const kw = this.searchKey.trim();
+        if (!kw) { this.resetQuickSearch(); return; }
+        this.isLoading = true;
+        axios.get("/shop/search", { params: { keyword: kw, current: 1 } })
+          .then(({data}) => {
+            const list = data || [];
+            list.forEach(s => s.images = (s.images || '/imgs/icons/default-icon.png').split(',')[0]);
+            this.shops = list;
+            this.typeName = '搜索：' + kw;
+            if (list.length === 0) {
+              this.$message.warning('未找到相关商户');
+            }
+          })
+          .catch(err => { this.$message.error(err); })
+          .finally(() => { this.isLoading = false; });
+      },
+      resetQuickSearch() {
+        this.searchKey = "";
+        this.shops = [];
+        this.params.current = 1;
+        this.typeName = util.getUrlParam("name") || "";
+        this.queryShops();
+      },
+      goBack() {
+        history.back();
+      },
+      toDetail(id) {
+        location.href = "/shop-detail.html?id="+id
+      },
+      onScroll(e) {
+        let scrollTop = e.target.scrollTop;
+        let offsetHeight = e.target.offsetHeight;
+        let scrollHeight = e.target.scrollHeight;
+        if(scrollTop + offsetHeight + 1 > scrollHeight && !this.isReachBottom){
+          this.isReachBottom = true
+          console.log("触底")
+          this.params.current++
+          this.queryShops(this.params.current, 5);
+        }else{
+          this.isReachBottom = false
+        }
+      },
+    }
+  })
+</script>
+</body>
+</html>

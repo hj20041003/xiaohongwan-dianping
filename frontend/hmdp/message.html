@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消息中心 - 小红碗点评</title>
+    <link rel="stylesheet" href="./css/element.css">
+    <link href="./css/main.css" rel="stylesheet">
+    <style>
+        :root {
+            --brand-color: #ff6633;
+            --brand-light: #fff2ec;
+            --text-1: #333333;
+            --text-2: #666666;
+            --text-3: #999999;
+            --bg-page: #f7f7f8;
+            --card-bg: #ffffff;
+        }
+        body { background: var(--bg-page); }
+        .message-page { max-width: 680px; margin: 0 auto 90px; padding: 0 12px; }
+
+        /* 顶部标题栏 */
+        .message-toolbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 4px 10px;
+        }
+        .message-toolbar__title { font-size: 18px; font-weight: 700; color: var(--text-1); }
+        .message-toolbar__unread {
+            display: inline-block; background: var(--brand-color); color: #ffffff;
+            font-size: 12px; border-radius: 10px; padding: 1px 8px; margin-left: 8px;
+        }
+        .message-toolbar__readall { color: var(--brand-color); font-size: 13px; cursor: pointer; }
+        .message-toolbar__readall:hover { opacity: 0.8; }
+
+        /* 类型筛选 Tabs */
+        .message-tabs {
+            display: flex; gap: 8px; margin-bottom: 12px;
+        }
+        .message-tab {
+            padding: 6px 16px; border-radius: 16px; font-size: 13px;
+            background: #ffffff; color: var(--text-2); cursor: pointer;
+            border: 1px solid #eeeeee; transition: all 0.15s;
+        }
+        .message-tab:hover { border-color: var(--brand-color); color: var(--brand-color); }
+        .message-tab--active {
+            background: var(--brand-light); border-color: var(--brand-color);
+            color: var(--brand-color); font-weight: 600;
+        }
+
+        /* 消息卡片 */
+        .message-list__item {
+            display: flex; align-items: flex-start;
+            background: var(--card-bg); border-radius: 12px;
+            padding: 14px 16px; margin-bottom: 10px;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+            cursor: pointer; transition: box-shadow 0.15s, transform 0.15s;
+        }
+        .message-list__item:hover { box-shadow: 0 6px 18px rgba(255, 102, 51, 0.12); transform: translateY(-1px); }
+        .message-list__item--unread {
+            background: linear-gradient(135deg, #fff8f4, #ffffff);
+            border-left: 3px solid var(--brand-color);
+        }
+        .message-list__avatar {
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: #ffffff; margin-right: 12px; flex-shrink: 0;
+        }
+        .message-list__avatar--like { background: linear-gradient(135deg, #ff5577, #ff88aa); }
+        .message-list__avatar--system { background: linear-gradient(135deg, #667eea, #88aaff); }
+        .message-list__body { flex: 1; min-width: 0; }
+        .message-list__content {
+            font-size: 14px; color: var(--text-1); line-height: 1.6; word-break: break-all;
+        }
+        .message-list__item--unread .message-list__content { font-weight: 600; }
+        .message-list__time { font-size: 12px; color: var(--text-3); margin-top: 5px; }
+        .message-list__dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--brand-color); margin-left: 8px; margin-top: 6px; flex-shrink: 0;
+        }
+
+        /* 空状态 */
+        .message-empty { text-align: center; padding: 70px 0 40px; color: var(--text-3); }
+        .message-empty__icon { font-size: 52px; margin-bottom: 14px; }
+        .message-empty__text { font-size: 14px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <header class="header">
+        <div class="header-back-btn" @click="handleBack"><i class="el-icon-arrow-left"></i></div>
+        <div class="header-title">消息中心</div>
+    </header>
+
+    <main class="message-page">
+        <div class="message-toolbar">
+            <span class="message-toolbar__title">
+                我的消息
+                <span class="message-toolbar__unread" v-if="unreadCount > 0">{{ unreadCount }} 条未读</span>
+            </span>
+            <span class="message-toolbar__readall"
+                  v-if="unreadCount > 0" @click="handleReadAll">全部已读</span>
+        </div>
+
+        <div class="message-tabs">
+            <span class="message-tab" v-for="tab in tabs" :key="tab.value"
+                  :class="{ 'message-tab--active': activeTab === tab.value }"
+                  @click="activeTab = tab.value">{{ tab.label }}</span>
+        </div>
+
+        <section class="message-list" v-loading="isLoading">
+            <div class="message-list__item"
+                 v-for="msg in filteredMessages" :key="msg.id"
+                 :class="{ 'message-list__item--unread': msg.isRead === 0 }"
+                 @click="handleItemClick(msg)">
+                <span class="message-list__avatar"
+                      :class="msg.type === 1 ? 'message-list__avatar--like' : 'message-list__avatar--system'">
+                    {{ msg.type === 1 ? '❤' : '📣' }}
+                </span>
+                <div class="message-list__body">
+                    <div class="message-list__content">{{ msg.content }}</div>
+                    <div class="message-list__time">{{ formatTime(msg.createTime) }}</div>
+                </div>
+                <span class="message-list__dot" v-if="msg.isRead === 0"></span>
+            </div>
+
+            <div class="message-empty" v-if="!isLoading && filteredMessages.length === 0">
+                <div class="message-empty__icon">🥣</div>
+                <div class="message-empty__text">暂无消息，去给大家的笔记点个赞吧～</div>
+            </div>
+        </section>
+    </main>
+
+    <foot-bar :active-btn="3"></foot-bar>
+</div>
+
+<script src="./js/vue.js"></script>
+<script src="./js/element.js"></script>
+<script src="./js/footer.js"></script>
+<script>
+const MESSAGE_LIMIT = 50;
+
+const app = new Vue({
+  el: '#app',
+  data: {
+    messageList: [],
+    unreadCount: 0,
+    isLoading: true,
+    activeTab: 'all',
+    tabs: [
+      { label: '全部', value: 'all' },
+      { label: '点赞', value: 'like' },
+      { label: '系统', value: 'system' }
+    ]
+  },
+  computed: {
+    filteredMessages() {
+      if (this.activeTab === 'all') return this.messageList;
+      const type = this.activeTab === 'like' ? 1 : 2;
+      return this.messageList.filter(msg => msg.type === type);
+    }
+  },
+  mounted() {
+    this.loadMessages();
+  },
+  methods: {
+    handleBack() { history.back(); },
+    async loadMessages() {
+      try {
+        const listRes = await axios.get('/message/list');
+        this.messageList = (listRes.data || []).slice(0, MESSAGE_LIMIT);
+        const unreadRes = await axios.get('/message/unread');
+        this.unreadCount = unreadRes.data || 0;
+      } catch (error) {
+        // 401 由 axios 拦截器统一跳转登录页
+        console.log(error);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+    async handleReadAll() {
+      try {
+        await axios.post('/message/read');
+        this.messageList = this.messageList.map(msg => Object.assign({}, msg, { isRead: 1 }));
+        this.unreadCount = 0;
+        this.$message.success('已全部标记为已读');
+      } catch (error) {
+        this.$message.error(String(error));
+      }
+    },
+    async handleItemClick(msg) {
+      if (msg.isRead === 0) {
+        msg.isRead = 1;
+        this.unreadCount = Math.max(0, this.unreadCount - 1);
+        // 单条已读后若清零，后台静默同步
+        if (this.unreadCount === 0) {
+          try { await axios.post('/message/read'); } catch (e) { /* 忽略 */ }
+        }
+      }
+      if (msg.targetId) {
+        location.href = '/blog-detail.html?id=' + msg.targetId;
+      }
+    },
+    formatTime(value) {
+      if (!value) return '';
+      return String(value).replace('T', ' ').slice(0, 16);
+    }
+  }
+});
+</script>
+</body>
+</html>

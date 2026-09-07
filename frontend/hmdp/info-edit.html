@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>资料编辑 - 小红碗点评</title>
+  <link rel="stylesheet" href="./css/element.css">
+  <link href="./css/main.css" rel="stylesheet">
+  <link href="./css/info.css" rel="stylesheet">
+  <style>
+      .info-item { cursor: pointer; }
+      .info-item:hover .info-label { color: #ff6633; }
+      .gender-grid { display: flex; gap: 10px; }
+      .gender-opt {
+          flex: 1; text-align: center; padding: 10px 0;
+          border: 1px solid #e4e4e4; border-radius: 8px; cursor: pointer;
+      }
+      .gender-opt--active { border-color: #ff6633; color: #ff6633; background: #fff2ec; }
+  </style>
+<link href="./css/theme.css" rel="stylesheet">
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-back-btn" @click="goBack" ><i class="el-icon-arrow-left"></i></div>
+    <div class="header-title">资料编辑&nbsp;&nbsp;&nbsp;</div>
+  </div>
+  <div class="edit-container">
+    <div class="info-box">
+      <div class="info-item" @click="$refs.avatarFile.click()">
+        <div class="info-label">头像</div>
+        <div class="info-btn">
+          <img width="35" style="border-radius:50%;object-fit:cover"
+               :src="user.icon || '/imgs/icons/default-icon.png'" alt="">
+          <div><i :class="avatarUploading ? 'el-icon-loading' : 'el-icon-camera'"></i></div>
+        </div>
+      </div>
+      <input name="avatarFile" type="file" accept="image/*" ref="avatarFile" style="display:none"
+             @change="onAvatarChange">
+      <div class="divider"></div>
+      <div class="info-item" @click="openNickName">
+        <div class="info-label">昵称</div>
+        <div class="info-btn">
+          <div>{{user.nickName}}</div>
+          <div><i class="el-icon-edit"></i></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="info-item" @click="openDialog('introduce')">
+        <div class="info-label">个人介绍</div>
+        <div class="info-btn">
+          <div style="overflow: hidden; width: 150px;text-align: right">{{info.introduce || '介绍一下自己'}}</div>
+          <div><i class="el-icon-edit"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="info-box">
+      <div class="info-item" @click="openDialog('gender')">
+        <div class="info-label">性别</div>
+        <div class="info-btn">
+          <div>{{genderText}}</div>
+          <div><i class="el-icon-edit"></i></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="info-item" @click="openDialog('city')">
+        <div class="info-label">所在地区</div>
+        <div class="info-btn">
+          <div>{{info.city || '选择省 / 市 / 区'}}</div>
+          <div><i class="el-icon-edit"></i></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="info-item" @click="openDialog('birthday')">
+        <div class="info-label">生日</div>
+        <div class="info-btn">
+          <div>{{info.birthday || '添加'}}</div>
+          <div><i class="el-icon-edit"></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 昵称弹窗 -->
+  <el-dialog title="修改昵称" :visible.sync="nickVisible" width="320px" center>
+    <el-input name="nickInput" v-model="nickInput" maxlength="16" placeholder="1-16 个字符" clearable></el-input>
+    <div slot="footer">
+      <el-button size="small" @click="nickVisible = false">取消</el-button>
+      <el-button type="primary" size="small" @click="saveNickName">保存</el-button>
+    </div>
+  </el-dialog>
+
+  <!-- 资料弹窗 -->
+  <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="360px" center>
+    <el-input name="introduce" v-if="editField === 'introduce'" v-model="info.introduce" type="textarea"
+              :rows="3" maxlength="100" placeholder="介绍一下自己（100 字以内）"></el-input>
+    <div v-else-if="editField === 'gender'" class="gender-grid">
+      <div class="gender-opt" :class="{ 'gender-opt--active': info.gender === true }"
+           @click="info.gender = true">男</div>
+      <div class="gender-opt" :class="{ 'gender-opt--active': info.gender === false }"
+           @click="info.gender = false">女</div>
+    </div>
+    <el-cascader v-else-if="editField === 'city'" v-model="cityRegion" :options="areaOptions"
+                 placeholder="省 / 市 / 区" style="width: 100%" filterable></el-cascader>
+    <el-date-picker v-else-if="editField === 'birthday'" v-model="info.birthday" type="date"
+                    value-format="yyyy-MM-dd" placeholder="选择生日" style="width: 100%"></el-date-picker>
+    <div slot="footer">
+      <el-button size="small" @click="dialogVisible = false">取消</el-button>
+      <el-button type="primary" size="small" @click="saveInfo">保存</el-button>
+    </div>
+  </el-dialog>
+
+  <foot-bar :active-btn="4"></foot-bar>
+</div>
+<script src="./js/vue.js"></script>
+<script src="./js/axios.min.js"></script>
+<!-- 引入组件库 -->
+<script src="./js/element.js"></script>
+<script src="./js/common.js"></script>
+<script src="./js/china-area.js"></script>
+<script src="./js/footer.js"></script>
+<script>
+
+  const app = new Vue({
+    el: "#app",
+    data: {
+      user: "",
+      info: {},
+      cityRegion: [],
+      areaOptions: [],
+      nickVisible: false,
+      avatarUploading: false,
+      nickInput: "",
+      dialogVisible: false,
+      editField: ""
+    },
+    computed: {
+      dialogTitle() {
+        return { introduce: "编辑个人介绍", gender: "选择性别", city: "所在城市", birthday: "设置生日" }[this.editField] || "编辑";
+      },
+      genderText() {
+        if (this.info.gender === true) return "男";
+        if (this.info.gender === false) return "女";
+        return "选择";
+      }
+    },
+    created() {
+      this.areaOptions = CHINA_AREA3.map(prov => ({
+        value: prov.name, label: prov.name,
+        children: prov.cities.map(c => ({
+          value: c.name, label: c.name,
+          children: c.districts.map(d => ({ value: d, label: d }))
+        }))
+      }));
+      this.checkLogin();
+    },
+    methods: {
+      checkLogin() {
+        axios.get("/user/me")
+        .then(({data}) => {
+          this.user = data;
+          // 拉取已有资料
+          axios.get("/user/info/" + data.id)
+            .then(({data: info}) => { this.info = info || {}; })
+            .catch(() => { this.info = {}; });
+        })
+        .catch(err => {
+          this.$message.error(err);
+          setTimeout(() => location.href = "login.html", 1000);
+        })
+      },
+      onAvatarChange(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+          this.$message.warning("图片不能超过 5MB");
+          e.target.value = "";
+          return;
+        }
+        this.avatarUploading = true;
+        const fd = new FormData();
+        fd.append("file", file);
+        // 1) 上传图片文件（落盘到 nginx 静态目录）
+        axios.post("/upload/blog", fd,
+                   { headers: { "Content-Type": "multipart/form-data" }, timeout: 30000 })
+          .then(({ data }) => {
+            // 2) 把返回的图片路径写入当前用户头像
+            return axios.put("/user/icon?icon=" + encodeURIComponent("/imgs" + data));
+          })
+          .then(({ data }) => {
+            this.user = data;
+            this.$message.success("头像已更新");
+          })
+          .catch(err => this.$message.error("头像更新失败：" + err))
+          .finally(() => {
+            this.avatarUploading = false;
+            e.target.value = "";
+          });
+      },
+      openNickName() {
+        this.nickInput = this.user.nickName || "";
+        this.nickVisible = true;
+      },
+      saveNickName() {
+        const nick = this.nickInput.trim();
+        if (!nick) { this.$message.warning("昵称不能为空"); return; }
+        axios.put("/user/nickName?nickName=" + encodeURIComponent(nick))
+          .then(({data}) => {
+            this.user = data;
+            this.nickVisible = false;
+            this.$message.success("昵称已更新");
+          })
+          .catch(err => this.$message.error(err));
+      },
+      openDialog(field) {
+        this.editField = field;
+        this.dialogVisible = true;
+      },
+      saveInfo() {
+        if (this.editField === "city" && this.cityRegion.length > 0) {
+          this.info.city = this.cityRegion.slice(1).join(" ") || this.cityRegion[0];
+        }
+        const payload = {
+          introduce: this.info.introduce || null,
+          gender: this.info.gender === true ? true : (this.info.gender === false ? false : null),
+          city: this.info.city || null,
+          birthday: this.info.birthday || null
+        };
+        axios.post("/user/info/update", payload)
+          .then(() => {
+            this.dialogVisible = false;
+            this.$message.success("资料已保存");
+            sessionStorage.setItem("userInfo", JSON.stringify(this.info));
+          })
+          .catch(err => this.$message.error(err));
+      },
+      goBack(){
+        history.back();
+      }
+    },
+
+  })
+</script>
+</body>
+</html>

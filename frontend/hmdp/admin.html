@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后端 - 小红碗点评</title>
+    <link rel="stylesheet" href="./css/element.css">
+    <link href="./css/theme.css" rel="stylesheet">
+    <link href="./css/leaflet.css" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #ff6633;
+            --brand-2: #ff8855;
+            --brand-light: #fff2ec;
+            --sidebar-bg: #263445;
+            --sidebar-text: #bfcbd9;
+            --sidebar-active: #ffffff;
+            --text-1: #333333;
+            --text-2: #666666;
+            --text-3: #999999;
+            --bg-page: #f0f2f5;
+            --card-bg: #ffffff;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg-page); font-family: "Microsoft YaHei", sans-serif; }
+
+        /* ---------- 管理口令门 ---------- */
+        .gate { position: fixed; inset: 0; background: linear-gradient(160deg, #263445, #3a4f66);
+                display: flex; align-items: center; justify-content: center; z-index: 3000; }
+        .gate__card { background: #ffffff; border-radius: 14px; padding: 36px 34px; width: 340px;
+                      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); }
+        .gate__logo { text-align: center; font-size: 22px; font-weight: 700; color: var(--brand); margin-bottom: 6px; }
+        .gate__sub { text-align: center; color: #999999; font-size: 13px; margin-bottom: 22px; }
+
+        /* ---------- 整体布局 ---------- */
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 200px; background: var(--sidebar-bg); flex-shrink: 0;
+                   display: flex; flex-direction: column; }
+        .sidebar__logo { color: #ffffff; font-size: 17px; font-weight: 700;
+                         text-align: center; padding: 22px 0 18px; letter-spacing: 1px; }
+        .sidebar__menu { flex: 1; }
+        .sidebar__item { display: flex; align-items: center; gap: 10px;
+                         padding: 14px 22px; color: var(--sidebar-text);
+                         cursor: pointer; font-size: 14px; transition: all 0.15s;
+                         border-left: 3px solid transparent; }
+        .sidebar__item:hover { color: var(--sidebar-active); background: rgba(255,255,255,0.06); }
+        .sidebar__item--active { color: var(--sidebar-active);
+                                 background: var(--brand); border-left-color: #ffd9c9; }
+        .sidebar__footer { padding: 16px; text-align: center; }
+        .sidebar__back { color: var(--sidebar-text); font-size: 13px; cursor: pointer; text-decoration: none; }
+        .sidebar__back:hover { color: #ffffff; }
+
+        .main { flex: 1; padding: 20px 24px; min-width: 0; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+        .topbar__title { font-size: 20px; font-weight: 700; color: var(--text-1); }
+        .topbar__sub { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+
+        /* ---------- 统计卡片 ---------- */
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 18px; }
+        .stat-card { background: var(--card-bg); border-radius: 14px; padding: 20px;
+                     display: flex; align-items: center; gap: 14px;
+                     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05); }
+        .stat-card__icon { width: 48px; height: 48px; border-radius: 12px;
+                           display: flex; align-items: center; justify-content: center;
+                           font-size: 22px; color: #ffffff; flex-shrink: 0; }
+        .stat-card__icon--shop { background: linear-gradient(135deg, #ff6633, #ff8855); }
+        .stat-card__icon--user { background: linear-gradient(135deg, #409eff, #79bbff); }
+        .stat-card__icon--blog { background: linear-gradient(135deg, #ff5577, #ff88aa); }
+        .stat-card__icon--voucher { background: linear-gradient(135deg, #67c23a, #95d475); }
+        .stat-card__value { font-size: 26px; font-weight: 700; color: var(--text-1); }
+        .stat-card__label { font-size: 13px; color: var(--text-3); }
+
+        /* ---------- 内容卡 ---------- */
+        .panel { background: var(--card-bg); border-radius: 14px; padding: 8px 18px 18px;
+                 box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05); }
+        .panel-toolbar { display: flex; align-items: center; margin-bottom: 4px; }
+        .panel-tip { font-size: 12px; color: var(--text-3); margin-top: 8px; }
+
+        /* 选点地图 */
+        #pickMap { width: 100%; height: 240px; border-radius: 8px; z-index: 1; }
+        .upload-uploading { opacity: 0.6; pointer-events: none; }
+
+        @media (max-width: 900px) {
+            .sidebar { width: 64px; }
+            .sidebar__logo { font-size: 13px; }
+            .sidebar__item { justify-content: center; padding: 14px 8px; }
+            .sidebar__item span.txt { display: none; }
+            .stat-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+
+<!-- 管理口令门 -->
+<div class="gate" v-if="!isAuthed">
+    <div class="gate__card">
+        <div class="gate__logo">🥣 小红碗点评</div>
+        <div class="gate__sub">管理控制台 · 请输入管理口令</div>
+        <el-input name="gateInput" v-model="gateInput" type="password" placeholder="管理口令"
+                  @keyup.enter.native="doAuth" clearable></el-input>
+        <el-button type="primary" style="width: 100%; margin-top: 14px" @click="doAuth">进入管理后台</el-button>
+        <div style="text-align: center; margin-top: 12px; font-size: 12px; color: #bbb">演示口令：admin123</div>
+    </div>
+</div>
+
+<!-- 主布局 -->
+<div class="layout" v-else>
+    <aside class="sidebar">
+        <div class="sidebar__logo">🥣 小红碗管理</div>
+        <nav class="sidebar__menu">
+            <div class="sidebar__item" :class="{ 'sidebar__item--active': activeTab === 'dashboard' }" @click="activeTab = 'dashboard'">
+                <i class="el-icon-data-line"></i><span class="txt">数据概览</span>
+            </div>
+            <div class="sidebar__item" :class="{ 'sidebar__item--active': activeTab === 'shop' }" @click="activeTab = 'shop'">
+                <i class="el-icon-shop"></i><span class="txt">商户管理</span>
+            </div>
+            <div class="sidebar__item" :class="{ 'sidebar__item--active': activeTab === 'user' }" @click="activeTab = 'user'">
+                <i class="el-icon-user"></i><span class="txt">用户管理</span>
+            </div>
+            <div class="sidebar__item" :class="{ 'sidebar__item--active': activeTab === 'blog' }" @click="activeTab = 'blog'">
+                <i class="el-icon-document"></i><span class="txt">笔记管理</span>
+            </div>
+            <div class="sidebar__item" :class="{ 'sidebar__item--active': activeTab === 'voucher' }" @click="activeTab = 'voucher'">
+                <i class="el-icon-ticket"></i><span class="txt">优惠券管理</span>
+            </div>
+        </nav>
+        <div class="sidebar__footer">
+            <a class="sidebar__back" href="/index.html">« 返回前台</a>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="topbar">
+            <div>
+                <div class="topbar__title">{{ tabTitle }}</div>
+                <div class="topbar__sub">小红碗点评 · 管理控制台</div>
+            </div>
+            <el-button icon="el-icon-refresh" circle size="small" @click="loadAll"></el-button>
+        </div>
+
+        <!-- 数据概览 -->
+        <section v-show="activeTab === 'dashboard'">
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--shop"><i class="el-icon-shop"></i></div>
+                    <div><div class="stat-card__value">{{ shopList.length }}</div><div class="stat-card__label">入驻商户</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--user"><i class="el-icon-user"></i></div>
+                    <div><div class="stat-card__value">{{ userList.length }}</div><div class="stat-card__label">注册用户</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--blog"><i class="el-icon-document"></i></div>
+                    <div><div class="stat-card__value">{{ blogList.length }}</div><div class="stat-card__label">探店笔记</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--voucher"><i class="el-icon-ticket"></i></div>
+                    <div><div class="stat-card__value">{{ voucherList.length }}</div><div class="stat-card__label">优惠券</div></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-toolbar">
+                    <h3 style="margin: 12px 0; color: #333">平台速览</h3>
+                </div>
+                <el-descriptions :column="2" border size="medium">
+                    <el-descriptions-item label="最多赞笔记">{{ topBlog || '—' }}</el-descriptions-item>
+                    <el-descriptions-item label="评分最高商户">{{ topShop || '—' }}</el-descriptions-item>
+                    <el-descriptions-item label="笔记总点赞">{{ totalLikes }}</el-descriptions-item>
+                    <el-descriptions-item label="优惠券库存总量">{{ totalStock }}</el-descriptions-item>
+                </el-descriptions>
+            </div>
+        </section>
+
+        <!-- 商户管理 -->
+        <section class="panel" v-show="activeTab === 'shop'">
+            <div class="panel-toolbar">
+                <el-button type="primary" size="small" icon="el-icon-plus" @click="openShopDialog">新增商户</el-button>
+            </div>
+            <el-table :data="shopList" size="small" stripe>
+                <el-table-column prop="id" label="ID" width="60"></el-table-column>
+                <el-table-column prop="name" label="名称" min-width="180"></el-table-column>
+                <el-table-column prop="address" label="地址" min-width="200"></el-table-column>
+                <el-table-column label="人均" width="80">
+                    <template slot-scope="{ row }">¥{{ row.avgPrice }}</template>
+                </el-table-column>
+                <el-table-column label="评分" width="80">
+                    <template slot-scope="{ row }">{{ (row.score / 10).toFixed(1) }}</template>
+                </el-table-column>
+                <el-table-column label="操作" width="90">
+                    <template slot-scope="{ row }">
+                        <el-button type="danger" size="mini" plain @click="handleDeleteShop(row)">删除</el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </section>
+
+        <!-- 用户管理 -->
+        <section class="panel" v-show="activeTab === 'user'">
+            <el-table :data="userList" size="small" stripe>
+                <el-table-column prop="id" label="ID" width="60"></el-table-column>
+                <el-table-column prop="nickName" label="昵称" min-width="160"></el-table-column>
+                <el-table-column prop="phone" label="手机号" width="140"></el-table-column>
+                <el-table-column label="注册时间" min-width="160">
+                    <template slot-scope="{ row }">{{ formatTime(row.createTime) }}</template>
+                </el-table-column>
+            </el-table>
+            <div class="panel-tip">用户数据由登录流程自动注册，此处仅查看。</div>
+        </section>
+
+        <!-- 笔记管理 -->
+        <section class="panel" v-show="activeTab === 'blog'">
+            <el-table :data="blogList" size="small" stripe>
+                <el-table-column prop="id" label="ID" width="60"></el-table-column>
+                <el-table-column prop="title" label="标题" min-width="200"></el-table-column>
+                <el-table-column prop="name" label="作者" width="140"></el-table-column>
+                <el-table-column prop="liked" label="点赞" width="80"></el-table-column>
+                <el-table-column prop="comments" label="评论" width="80"></el-table-column>
+                <el-table-column label="操作" width="90">
+                    <template slot-scope="{ row }">
+                        <el-button type="danger" size="mini" plain @click="handleDeleteBlog(row)">删除</el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </section>
+
+        <!-- 优惠券管理 -->
+        <section class="panel" v-show="activeTab === 'voucher'">
+            <div class="panel-toolbar">
+                <el-button type="primary" size="small" icon="el-icon-plus" @click="openVoucherDialog">新增优惠券</el-button>
+            </div>
+            <el-table :data="voucherList" size="small" stripe>
+                <el-table-column prop="id" label="ID" width="60"></el-table-column>
+                <el-table-column prop="title" label="标题" min-width="180"></el-table-column>
+                <el-table-column label="类型" width="90">
+                    <template slot-scope="{ row }">{{ row.type === 1 ? '秒杀券' : '普通券' }}</template>
+                </el-table-column>
+                <el-table-column label="售价" width="90">
+                    <template slot-scope="{ row }">¥{{ formatFen(row.payValue) }}</template>
+                </el-table-column>
+                <el-table-column label="面值" width="90">
+                    <template slot-scope="{ row }">¥{{ formatFen(row.actualValue) }}</template>
+                </el-table-column>
+                <el-table-column prop="stock" label="库存" width="80"></el-table-column>
+            </el-table>
+        </section>
+    </main>
+</div>
+
+<!-- 新增商户弹窗 -->
+<el-dialog title="新增商户" :visible.sync="shopDialogVisible" width="520px" top="4vh">
+    <el-form :model="shopForm" label-width="90px" size="small">
+        <el-form-item label="名称"><el-input name="name" v-model="shopForm.name"></el-input></el-form-item>
+        <el-form-item label="所在地区">
+          <el-cascader v-model="addrRegion" :options="areaOptions" placeholder="省 / 市 / 区"
+                       style="width: 100%" filterable></el-cascader>
+        </el-form-item>
+        <el-form-item label="详细地址"><el-input name="address" v-model="shopForm.address" placeholder="街道、门牌号等"></el-input></el-form-item>
+        <el-form-item label="分类ID"><el-input v-model.number="shopForm.typeId" type="number"></el-input></el-form-item>
+        <el-form-item label="人均(元)"><el-input v-model.number="shopForm.avgPrice" type="number"></el-input></el-form-item>
+        <el-form-item label="商户图片">
+          <el-upload action="#" list-type="picture-card" :auto-upload="false" :limit="1"
+                     :on-change="onImageChange" :on-remove="onImageRemove"
+                     :file-list="imageFileList" :class="{ 'upload-uploading': uploading }">
+            <i class="el-icon-plus" v-if="!shopForm.images"></i>
+            <div slot="tip" class="el-upload__tip">
+              点击上传图片（自动保存到服务器）
+              <span v-if="shopForm.images" style="color:#ff6633">已上传：{{ shopForm.images }}</span>
+            </div>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="地图选点">
+            <div id="pickMap" style="width:100%;height:240px;border-radius:8px;z-index:1"></div>
+            <div style="font-size:12px;color:#999;margin-top:4px">
+                点击地图选点<span v-if="shopForm.x && shopForm.y" style="color:#ff6633;font-weight:600">
+                （已选：{{ shopForm.x }}, {{ shopForm.y }}）</span>
+            </div>
+        </el-form-item>
+    </el-form>
+    <div slot="footer">
+        <el-button size="small" @click="shopDialogVisible = false">取消</el-button>
+        <el-button type="primary" size="small" @click="handleCreateShop">保存</el-button>
+    </div>
+</el-dialog>
+
+<!-- 新增优惠券弹窗 -->
+<el-dialog title="新增优惠券" :visible.sync="voucherDialogVisible" width="480px">
+    <el-form :model="voucherForm" label-width="90px" size="small">
+        <el-form-item label="标题"><el-input name="title" v-model="voucherForm.title"></el-input></el-form-item>
+        <el-form-item label="商户ID"><el-input v-model.number="voucherForm.shopId" type="number"></el-input></el-form-item>
+        <el-form-item label="售价(分)"><el-input v-model.number="voucherForm.payValue" type="number"></el-input></el-form-item>
+        <el-form-item label="面值(分)"><el-input v-model.number="voucherForm.actualValue" type="number"></el-input></el-form-item>
+        <el-form-item label="库存"><el-input v-model.number="voucherForm.stock" type="number"></el-input></el-form-item>
+        <el-form-item label="规则说明"><el-input name="rules" v-model="voucherForm.rules" type="textarea"></el-input></el-form-item>
+    </el-form>
+    <div slot="footer">
+        <el-button size="small" @click="voucherDialogVisible = false">取消</el-button>
+        <el-button type="primary" size="small" @click="handleCreateVoucher">保存</el-button>
+    </div>
+</el-dialog>
+
+<script src="./js/vue.js"></script>
+<script src="./js/axios.min.js"></script>
+<script src="./js/element.js"></script>
+<script src="./js/common.js"></script>
+<script src="./js/leaflet.js"></script>
+<script src="./js/china-area.js"></script>
+<script>
+const SCORE_DIVISOR = 10;
+const TILE_URL = 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}';
+const TILE_SUBDOMAINS = '1234';
+const MAP_DEFAULT_CENTER = [30.322, 120.150];
+const MAP_DEFAULT_ZOOM = 13;
+const ADMIN_TOKEN = 'admin123';
+
+const app = new Vue({
+  el: '#app',
+  data: {
+    isAuthed: sessionStorage.getItem('adminToken') === ADMIN_TOKEN,
+    gateInput: '',
+    activeTab: 'dashboard',
+    shopList: [],
+    userList: [],
+    blogList: [],
+    voucherList: [],
+    shopDialogVisible: false,
+    voucherDialogVisible: false,
+    pickMapInstance: null,
+    pickMarker: null,
+    imageFileList: [],
+    uploading: false,
+    addrRegion: [],
+    areaOptions: [],
+    shopForm: { name: '', address: '', typeId: 1, x: '', y: '', avgPrice: 50, images: '' },
+    voucherForm: { title: '', shopId: 1, payValue: 100, actualValue: 200, stock: 100, rules: '' }
+  },
+  computed: {
+    tabTitle() {
+      return { dashboard: '数据概览', shop: '商户管理', user: '用户管理',
+               blog: '笔记管理', voucher: '优惠券管理' }[this.activeTab] || '管理后台';
+    },
+    topBlog() {
+      if (!this.blogList.length) return '';
+      const b = [...this.blogList].sort((a, c) => (c.liked || 0) - (a.liked || 0))[0];
+      return b.title;
+    },
+    topShop() {
+      if (!this.shopList.length) return '';
+      const s = [...this.shopList].sort((a, c) => (c.score || 0) - (a.score || 0))[0];
+      return s.name;
+    },
+    totalLikes() {
+      return this.blogList.reduce((sum, b) => sum + (b.liked || 0), 0);
+    },
+    totalStock() {
+      return this.voucherList.reduce((sum, v) => sum + (v.stock || 0), 0);
+    }
+  },
+  created() {
+    this.areaOptions = CHINA_AREA3.map(prov => ({
+      value: prov.name, label: prov.name,
+      children: prov.cities.map(c => ({
+        value: c.name, label: c.name,
+        children: c.districts.map(d => ({ value: d, label: d }))
+      }))
+    }));
+    if (this.isAuthed) this.loadAll();
+  },
+  methods: {
+    doAuth() {
+      if (this.gateInput === ADMIN_TOKEN) {
+        sessionStorage.setItem('adminToken', ADMIN_TOKEN);
+        this.isAuthed = true;
+        this.loadAll();
+      } else {
+        this.$message.error('口令错误');
+      }
+    },
+    async loadAll() {
+      const [shopRes, userRes, blogRes, voucherRes] = await Promise.allSettled([
+        axios.get('/shop/list'),
+        axios.get('/user/list'),
+        axios.get('/blog/list'),
+        axios.get('/voucher/all')
+      ]);
+      this.shopList = shopRes.status === 'fulfilled' ? (shopRes.value.data || []) : [];
+      this.userList = userRes.status === 'fulfilled' ? (userRes.value.data || []) : [];
+      this.blogList = blogRes.status === 'fulfilled' ? (blogRes.value.data || []) : [];
+      this.voucherList = voucherRes.status === 'fulfilled' ? (voucherRes.value.data || []) : [];
+    },
+    openShopDialog() {
+      this.addrRegion = [];
+      this.shopDialogVisible = true;
+      this.$nextTick(() => { setTimeout(() => { this.initPickMap(); }, 200); });
+    },
+    initPickMap() {
+      const el = document.getElementById('pickMap');
+      if (!el) return;
+      if (!this.pickMapInstance) {
+        this.pickMapInstance = L.map('pickMap').setView(MAP_DEFAULT_CENTER, MAP_DEFAULT_ZOOM);
+        L.tileLayer(TILE_URL, { subdomains: TILE_SUBDOMAINS, attribution: '© 高德地图' })
+          .addTo(this.pickMapInstance);
+        this.pickMapInstance.on('click', e => {
+          this.shopForm.x = e.latlng.lng.toFixed(6);
+          this.shopForm.y = e.latlng.lat.toFixed(6);
+          this.setPickMarker(e.latlng);
+        });
+      }
+      this.pickMapInstance.invalidateSize();
+      const x = Number(this.shopForm.x), y = Number(this.shopForm.y);
+      if (x && y) this.setPickMarker({ lat: y, lng: x });
+    },
+    setPickMarker(latlng) {
+      if (this.pickMarker) {
+        this.pickMarker.setLatLng(latlng);
+      } else {
+        this.pickMarker = L.marker(latlng, { draggable: true }).addTo(this.pickMapInstance);
+        this.pickMarker.on('dragend', e => {
+          const ll = e.target.getLatLng();
+          this.shopForm.x = ll.lng.toFixed(6);
+          this.shopForm.y = ll.lat.toFixed(6);
+        });
+      }
+    },
+    onImageChange(file) {
+      const fd = new FormData();
+      fd.append("file", file.raw);
+      this.uploading = true;
+      // 上传走 user 服务的 /upload/blog，文件落盘到 nginx 静态目录
+      axios.post("/upload/blog", fd,
+                 { headers: { "Content-Type": "multipart/form-data" }, timeout: 30000 })
+        .then(({ data }) => {
+          // 后端返回相对路径（如 /blogs/1/2/xxx.jpg），拼上静态目录前缀
+          this.shopForm.images = "/imgs" + data;
+          this.imageFileList = [{ name: file.name, url: "/imgs" + data }];
+          this.$message.success("图片上传成功");
+        })
+        .catch(err => {
+          this.$message.error("图片上传失败：" + err);
+          this.imageFileList = [];
+        })
+        .finally(() => { this.uploading = false; });
+    },
+    onImageRemove() {
+      this.shopForm.images = "";
+      this.imageFileList = [];
+    },
+    async handleCreateShop() {
+      if (!this.shopForm.name) { this.$message.warning('请填写商户名称'); return; }
+      const regionText = (this.addrRegion || []).join(" ");
+      const payload = {
+        ...this.shopForm,
+        address: (regionText + " " + (this.shopForm.address || "")).trim(),
+        images: this.shopForm.images || '/imgs/icons/default-icon.png',
+        x: Number(this.shopForm.x) || 120.15,
+        y: Number(this.shopForm.y) || 30.32,
+        score: 40, sold: 0, comments: 0, openHours: '10:00-22:00'
+      };
+      try {
+        await axios.post('/shop', payload);
+        this.$message.success('商户已创建');
+        this.shopDialogVisible = false;
+        this.shopForm = { name: '', address: '', typeId: 1, x: '', y: '', avgPrice: 50, images: '' };
+        this.imageFileList = [];
+        if (this.pickMarker) { this.pickMapInstance.removeLayer(this.pickMarker); this.pickMarker = null; }
+        await this.loadAll();
+      } catch (error) {
+        this.$message.error(String(error));
+      }
+    },
+    async handleDeleteShop(shop) {
+      if (!confirm('确认删除商户「' + shop.name + '」？该操作不可恢复。')) return;
+      try {
+        await axios.delete('/shop/' + shop.id);
+        this.$message.success('已删除');
+        await this.loadAll();
+      } catch (error) {
+        this.$message.error(String(error));
+      }
+    },
+    async handleDeleteBlog(blog) {
+      if (!confirm('确认删除笔记「' + (blog.title || blog.id) + '」？')) return;
+      try {
+        await axios.delete('/blog/' + blog.id);
+        this.$message.success('已删除');
+        await this.loadAll();
+      } catch (error) {
+        this.$message.error(String(error));
+      }
+    },
+    async handleCreateVoucher() {
+      if (!this.voucherForm.title) { this.$message.warning('请填写优惠券标题'); return; }
+      const payload = {
+        ...this.voucherForm,
+        type: 0, status: 1,
+        payValue: Number(this.voucherForm.payValue),
+        actualValue: Number(this.voucherForm.actualValue),
+        stock: Number(this.voucherForm.stock)
+      };
+      try {
+        await axios.post('/voucher', payload);
+        this.$message.success('优惠券已创建');
+        this.voucherDialogVisible = false;
+        await this.loadAll();
+      } catch (error) {
+        this.$message.error(String(error));
+      }
+    },
+    formatTime(value) {
+      if (!value) return '';
+      return String(value).replace('T', ' ').slice(0, 16);
+    },
+    formatFen(value) {
+      if (value == null) return '-';
+      return (value / 100).toFixed(2);
+    }
+  }
+});
+</script>
+</div>
+</body>
+</html>

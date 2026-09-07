@@ -1,0 +1,19 @@
+server:
+  port: 8085
+spring:
+  application:
+    name: hmdp-blog
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:hmdp_blog;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    username: sa
+    password:
+    schema: classpath:db/hmdp.sql
+    initialization-mode: always
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        ip: 127.0.0.1
+mybatis-plus:
+  type-aliases-package: com.hmdp.entity

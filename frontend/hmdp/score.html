@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商户评分细分 - 口味/环境/服务</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f5f5f5; color: #333; }
+  header { background: linear-gradient(135deg, #ff6633, #ff9933); color: #fff; padding: 22px 20px; }
+  header h1 { font-size: 22px; }
+  header p { font-size: 13px; opacity: .9; margin-top: 6px; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .card { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .card h2 { font-size: 16px; margin-bottom: 14px; color: #ff6633; }
+  label { font-size: 13px; color: #666; margin-right: 6px; }
+  select, input[type=text] { padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+  .row { display: flex; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 6px; }
+  .stars { display: inline-flex; gap: 4px; }
+  .star { font-size: 22px; color: #ddd; cursor: pointer; transition: transform .1s; user-select: none; }
+  .star.on { color: #ff9933; }
+  .star:hover { transform: scale(1.15); }
+  textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-height: 60px; resize: vertical; }
+  .btn { background: #ff6633; color: #fff; border: none; padding: 10px 26px; border-radius: 20px; font-size: 15px; cursor: pointer; }
+  .btn:hover { background: #e5551f; }
+  .btn.gray { background: #ccc; }
+  .avg-box { display: flex; gap: 18px; align-items: center; }
+  .overall { text-align: center; }
+  .overall .num { font-size: 40px; font-weight: 700; color: #ff6633; line-height: 1; }
+  .overall .cnt { font-size: 12px; color: #999; margin-top: 4px; }
+  .bars { flex: 1; }
+  .bar-item { display: flex; align-items: center; margin: 7px 0; font-size: 13px; }
+  .bar-item .name { width: 56px; color: #666; }
+  .bar-item .track { flex: 1; height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin: 0 10px; }
+  .bar-item .fill { height: 100%; background: linear-gradient(90deg,#ff9933,#ff6633); border-radius: 4px; transition: width .4s; }
+  .bar-item .val { width: 32px; text-align: right; color: #ff6633; font-weight: 600; }
+  .rank-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f2f2f2; }
+  .rank-item:last-child { border-bottom: none; }
+  .rank-no { width: 30px; font-size: 18px; font-weight: 700; color: #ccc; }
+  .rank-no.top { color: #ff6633; }
+  .rank-info { flex: 1; }
+  .rank-info .name { font-size: 15px; font-weight: 600; }
+  .rank-info .sub { font-size: 12px; color: #999; margin-top: 3px; }
+  .rank-score { text-align: right; }
+  .rank-score .num { font-size: 22px; font-weight: 700; color: #ff6633; }
+  .rank-score .cnt { font-size: 11px; color: #999; }
+  .empty { text-align: center; color: #bbb; padding: 30px 0; font-size: 14px; }
+  .review { border-top: 1px dashed #eee; padding: 10px 0; font-size: 13px; }
+  .review .meta { color: #999; font-size: 12px; margin-bottom: 4px; }
+  .msg { margin-top: 10px; font-size: 13px; padding: 8px 12px; border-radius: 6px; display: none; }
+  .msg.ok { display: block; background: #f0fff4; color: #2f9e44; }
+  .msg.err { display: block; background: #fff0f0; color: #e03131; }
+</style>
+<link href="./css/theme.css" rel="stylesheet">
+</head>
+<body>
+<header>
+  <h1>⭐ 商户评分细分</h1>
+  <p>大众点评式三维评分：口味 / 环境 / 服务 —— 本项目新增功能</p>
+</header>
+<div class="wrap">
+  <div class="card">
+    <h2>提交评分</h2>
+    <div class="row">
+      <label>商户</label>
+      <select id="shopSel">
+        <option value="1">103茶餐厅</option>
+        <option value="2">蔡馬洪涛烤肉·老北京铜锅涮羊肉</option>
+        <option value="3">新白鹿餐厅(运河上街店)</option>
+      </select>
+      <label style="margin-left:14px">用户</label>
+      <select id="userSel">
+        <option value="1">测试用户1</option>
+        <option value="2">测试用户2</option>
+      </select>
+    </div>
+    <div class="row"><label>口味</label><span class="stars" data-key="taste"></span></div>
+    <div class="row"><label>环境</label><span class="stars" data-key="environment"></span></div>
+    <div class="row"><label>服务</label><span class="stars" data-key="service"></span></div>
+    <textarea id="content" placeholder="写点什么，比如「招牌奶茶好喝，位置也好找」(可选)"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="submitScore()">提交评分</button>
+      <button class="btn gray" onclick="loadDetail()">刷新</button>
+      <span id="msg" class="msg"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>当前商户评分概况</h2>
+    <div class="avg-box">
+      <div class="overall"><div class="num" id="ovNum">-</div><div class="cnt" id="ovCnt">暂无评分</div></div>
+      <div class="bars">
+        <div class="bar-item"><span class="name">口味</span><span class="track"><span class="fill" id="barT" style="width:0%"></span></span><span class="val" id="valT">-</span></div>
+        <div class="bar-item"><span class="name">环境</span><span class="track"><span class="fill" id="barE" style="width:0%"></span></span><span class="val" id="valE">-</span></div>
+        <div class="bar-item"><span class="name">服务</span><span class="track"><span class="fill" id="barS" style="width:0%"></span></span><span class="val" id="valS">-</span></div>
+      </div>
+    </div>
+    <div id="reviewList"></div>
+  </div>
+
+  <div class="card">
+    <h2>🔥 商户评分排行（按综合分）</h2>
+    <div id="rankList"><div class="empty">加载中...</div></div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+const state = { taste: 0, environment: 0, service: 0 };
+
+// 渲染三组星级
+document.querySelectorAll('.stars').forEach(box => {
+  const key = box.dataset.key;
+  for (let i = 1; i <= 5; i++) {
+    const s = document.createElement('span');
+    s.className = 'star';
+    s.textContent = '★';
+    s.onmouseenter = () => paint(box, key, i);
+    s.onmouseleave = () => paint(box, key, state[key]);
+    s.onclick = () => { state[key] = i; paint(box, key, i); };
+    box.appendChild(s);
+  }
+});
+function paint(box, key, n) {
+  [...box.children].forEach((el, idx) => el.classList.toggle('on', idx < n));
+}
+
+function showMsg(text, ok) {
+  const m = document.getElementById('msg');
+  m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err');
+  setTimeout(() => { m.className = 'msg'; }, 3000);
+}
+
+async function submitScore() {
+  if (!state.taste || !state.environment || !state.service) {
+    showMsg('请先给口味、环境、服务都打上星级', false); return;
+  }
+  const body = new URLSearchParams({
+    shopId: document.getElementById('shopSel').value,
+    userId: document.getElementById('userSel').value,
+    taste: state.taste, environment: state.environment, service: state.service,
+    content: document.getElementById('content').value
+  });
+  const r = await fetch(API + '/score', { method: 'POST', body }).then(x => x.json());
+  if (r.success) { showMsg('评分提交成功 ✓', true); loadDetail(); loadRank(); }
+  else showMsg('提交失败：' + (r.errorMsg || ''), false);
+}
+
+async function loadDetail() {
+  const shopId = document.getElementById('shopSel').value;
+  const r = await fetch(API + '/score/detail?shopId=' + shopId).then(x => x.json());
+  if (!r.success) return;
+  const d = r.data;
+  document.getElementById('ovNum').textContent = d.count ? d.overall.toFixed(1) : '-';
+  document.getElementById('ovCnt').textContent = d.count ? d.count + ' 人评分' : '暂无评分';
+  const set = (b, v, val) => { document.getElementById(b).style.width = (v * 20) + '%'; document.getElementById(val).textContent = d.count ? v.toFixed(1) : '-'; };
+  set('barT', d.taste, 'valT'); set('barE', d.environment, 'valE'); set('barS', d.service, 'valS');
+  const list = document.getElementById('reviewList');
+  list.innerHTML = (d.scores || []).slice().reverse().map(s => `
+    <div class="review">
+      <div class="meta">用户${s.userId} · 口味${s.taste} 环境${s.environment} 服务${s.service}</div>
+      ${s.content ? '<div>' + escapeHtml(s.content) + '</div>' : ''}
+    </div>`).join('');
+}
+
+async function loadRank() {
+  const r = await fetch(API + '/score/rank').then(x => x.json());
+  if (!r.success) return;
+  const el = document.getElementById('rankList');
+  if (!r.data.length) { el.innerHTML = '<div class="empty">还没有任何评分，来当第一个吧～</div>'; return; }
+  el.innerHTML = r.data.map((d, i) => `
+    <div class="rank-item">
+      <div class="rank-no ${i < 3 ? 'top' : ''}">${i + 1}</div>
+      <div class="rank-info">
+        <div class="name">${escapeHtml(d.shopName)}</div>
+        <div class="sub">口味 ${d.taste.toFixed(1)} · 环境 ${d.environment.toFixed(1)} · 服务 ${d.service.toFixed(1)}</div>
+      </div>
+      <div class="rank-score"><div class="num">${d.overall.toFixed(1)}</div><div class="cnt">${d.count} 人</div></div>
+    </div>`).join('');
+}
+
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+
+document.getElementById('shopSel').onchange = loadDetail;
+loadDetail(); loadRank();
+</script>
+</body>
+</html>
